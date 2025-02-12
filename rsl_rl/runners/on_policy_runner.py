@@ -33,6 +33,8 @@ import os
 from collections import deque
 import statistics
 
+import wandb
+
 from torch.utils.tensorboard import SummaryWriter
 import torch
 
@@ -137,6 +139,19 @@ class OnPolicyRunner:
             if it % self.save_interval == 0:
                 self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
             ep_infos.clear()
+
+            # 记录到wandb
+            wandb.log({
+                "mean_value_loss": mean_value_loss,
+                "mean_surrogate_loss": mean_surrogate_loss,
+                "learning_rate": self.alg.learning_rate,
+                "mean_noise_std": self.alg.actor_critic.std.mean().item(),
+                "total_fps": int(self.num_steps_per_env * self.env.num_envs / (collection_time + learn_time)),
+                "collection_time": collection_time,
+                "learning_time": learn_time,
+                "mean_reward": statistics.mean(rewbuffer) if len(rewbuffer) > 0 else 0,
+                "mean_episode_length": statistics.mean(lenbuffer) if len(lenbuffer) > 0 else 0
+            })
         
         self.current_learning_iteration += num_learning_iterations
         self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(self.current_learning_iteration)))
